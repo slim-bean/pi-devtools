@@ -1,0 +1,52 @@
+{
+  "name": "pi-devtools",
+  "version": "0.1.0",
+  "description": "Drive a live local Chrome from pi: navigate, eval JS, read console/network, screenshot, click/type. A browser debug loop for the software you are building.",
+  "type": "module",
+  "license": "MIT",
+  "keywords": [
+    "pi-package",
+    "browser",
+    "chrome",
+    "cdp",
+    "playwright",
+    "devtools",
+    "debug"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "typecheck": "scripts/typecheck.sh",
+    "smoke": "tsx scripts/smoke.ts"
+  },
+  "dependencies": {
+    "playwright-core": "^1.63.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.0"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-ai": "*",
+    "@earendil-works/pi-coding-agent": "*",
+    "typebox": "*"
+  },
+  "peerDependenciesMeta": {
+    "@earendil-works/pi-ai": {
+      "optional": true
+    },
+    "@earendil-works/pi-coding-agent": {
+      "optional": true
+    },
+    "typebox": {
+      "optional": true
+    }
+  }
+}
