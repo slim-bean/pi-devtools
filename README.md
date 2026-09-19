@@ -31,9 +31,15 @@ separate extension. Both can attach to the same Chrome.
 Requires Node ≥ 22 and Google Chrome (or Chromium).
 
 ```bash
+pi install git:github.com/slim-bean/pi-devtools
+```
+
+Or, to hack on it, clone and install the working tree instead:
+
+```bash
 git clone https://github.com/slim-bean/pi-devtools ~/projects/pi-devtools
 cd ~/projects/pi-devtools && npm install
-pi install ~/projects/pi-devtools        # or add the path to settings.json "packages"
+pi install ~/projects/pi-devtools
 ```
 
 Then start Chrome with remote debugging, either from pi:
