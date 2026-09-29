@@ -16,6 +16,7 @@ const parameters = Type.Object({
 export const registerEval: ToolRegistrar = (pi, session) => {
   pi.registerTool({
     name: "browser_eval",
+    executionMode: "sequential",
     label: "Browser Eval",
     description:
       "Run JavaScript in the current page and return the JSON-serialized result. Use it to inspect " +
@@ -24,8 +25,7 @@ export const registerEval: ToolRegistrar = (pi, session) => {
       "functions) come back as undefined or {}.",
     promptSnippet: "Run JavaScript in the live page and get the result",
     promptGuidelines: [
-      "Prefer browser_eval to read state (globals, store contents, element properties) over interpreting " +
-        "screenshots; use browser_screenshot for layout and visual questions.",
+      "Use browser_dom for ordinary page reading and interaction discovery; browser_eval for targeted state inspection or calculations. Use browser_screenshot for visual questions. JavaScript can mutate state: it is not read-only.",
     ],
     parameters,
     async execute(_id, params, signal) {

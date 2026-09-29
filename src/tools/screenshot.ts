@@ -29,6 +29,7 @@ const parameters = Type.Object({
 export const registerScreenshot: ToolRegistrar = (pi, session) => {
   pi.registerTool({
     name: "browser_screenshot",
+    executionMode: "sequential",
     label: "Browser Screenshot",
     description:
       "Screenshot the current tab (viewport, full page, or one element) and return it as an image. " +
