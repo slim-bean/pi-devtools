@@ -22,6 +22,7 @@ const parameters = Type.Object({
 export const registerDom: ToolRegistrar = (pi, session) => {
   pi.registerTool({
     name: "browser_dom",
+    executionMode: "sequential",
     label: "Browser DOM",
     description:
       "Inspect the current page's structure. mode aria returns the accessibility tree (what a screen " +

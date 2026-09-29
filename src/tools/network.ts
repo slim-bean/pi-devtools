@@ -28,6 +28,7 @@ const parameters = Type.Object({
 export const registerNetwork: ToolRegistrar = (pi, session) => {
   pi.registerTool({
     name: "browser_network",
+    executionMode: "sequential",
     label: "Browser Network",
     description:
       "Requests made by the current tab, buffered since the tab was adopted or last cleared: method, " +

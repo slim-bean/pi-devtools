@@ -20,6 +20,7 @@ const parameters = Type.Object({
 export const registerNavigate: ToolRegistrar = (pi, session) => {
   pi.registerTool({
     name: "browser_navigate",
+    executionMode: "sequential",
     label: "Browser Navigate",
     description:
       "Open a URL in the live Chrome tab that pi-devtools drives. The tab persists across calls, so " +
@@ -27,15 +28,12 @@ export const registerNavigate: ToolRegistrar = (pi, session) => {
       "and a summary of console errors and failed requests seen during the load.",
     promptSnippet: "Open a URL in the live local Chrome tab (persistent across calls)",
     promptGuidelines: [
-      "Use browser_navigate to open the app under development (e.g. localhost:3000) in a real Chrome, " +
-        "then use browser_console, browser_network, browser_eval, browser_dom, browser_screenshot and " +
-        "browser_interact on that same tab.",
-      "When browser_navigate, browser_interact or browser_wait report console errors or failed requests, " +
-        "read browser_console / browser_network before guessing at the cause.",
+      "Use browser_navigate for web research and authenticated or interactive sites, as well as local apps. Inspect with browser_dom or browser_read, then interact on the same tab.",
+      "Use browser_console / browser_network when failures affect the task; incidental third-party page errors do not need debugging.",
     ],
     parameters,
     async execute(_id, params, signal, onUpdate) {
-      const page = await session.getPage();
+      const page = await session.getPage(true);
       const url = normalizeUrl(params.url);
       onUpdate?.({ content: [{ type: "text", text: `Navigating to ${url}…` }], details: {} });
 

@@ -52,6 +52,7 @@ async function perform(page: Page, action: Action, selector: string | undefined,
 export const registerInteract: ToolRegistrar = (pi, session) => {
   pi.registerTool({
     name: "browser_interact",
+    executionMode: "sequential",
     label: "Browser Interact",
     description:
       "Click, type, press keys, hover, check boxes or pick options in the current tab, like a user " +

@@ -19,6 +19,7 @@ const parameters = Type.Object({
 export const registerWait: ToolRegistrar = (pi, session) => {
   pi.registerTool({
     name: "browser_wait",
+    executionMode: "sequential",
     label: "Browser Wait",
     description:
       "Wait for the page to reach a condition: an element appears/disappears, the URL changes, the " +

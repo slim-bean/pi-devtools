@@ -2,7 +2,7 @@
 
 pi-devtools is a pi extension that drives a live, user-launched Chrome over CDP
 (via `playwright-core`'s `connectOverCDP`) and exposes `browser_*` tools for
-debugging web apps under development. See `README.md` for user docs.
+research, authenticated web interaction, and application debugging. See `README.md` for user docs.
 
 ## Layout
 
@@ -11,8 +11,8 @@ debugging web apps under development. See `README.md` for user docs.
   Must not open sockets at load time (pi may load extensions in runs that never
   start a session).
 - `src/session.ts` — `DevtoolsSession`: lazy connect/reconnect to
-  `PI_DEVTOOLS_CDP_URL`, the single driven `Page` (adopts an idle `about:blank`
-  tab or opens one; re-opens if the user closes it), and bounded ring buffers
+  `PI_DEVTOOLS_CDP_URL`, the single driven `Page` (always creates its own background tab, never adopts
+  arbitrary blank tabs; reports state loss after closure/restart), and bounded ring buffers
   of `ConsoleEntry` / `NetworkEntry` for that page. `console(sinceTs)` /
   `network(sinceTs)` peek; `clearConsole()` / `clearNetwork()` drain. Bodies
   are captured only for failed xhr/fetch/document requests (capped 2KB).
@@ -22,8 +22,12 @@ debugging web apps under development. See `README.md` for user docs.
 - `src/format.ts` — LLM-facing rendering: `formatConsole`, `formatNetwork`,
   `sinceSummary` (the "what changed since ts" block appended to
   navigate/interact/wait results), `whereAmI`, `normalizeUrl`, `shortUrl`.
-- `src/launch.ts` — `probe()` (`GET /json/version`) and `launchChrome()`
-  (detached spawn of `scripts/chrome-launch.sh`, then poll until DevTools answers).
+- `src/config.ts` — endpoint/profile/auto-launch configuration; optional bearer
+  token or token-file auth is applied to both discovery and connectOverCDP.
+- `src/launch.ts` — `probe()`, `ensureChrome()`, `launchChrome()`. Managed launches
+  use a cross-process proper-lockfile lock and match CDP's identity to the new
+  Chrome's stderr announcement before recording it. Never adopt unknown listeners.
+- `src/index.ts` also serves versioned runtime/snapshot pi.events channels (README).
 - `src/command.ts` — `/devtools [status|launch [url]|disconnect]`.
 - `src/tools/` — one tool per file, each exporting a `ToolRegistrar`
   (`(pi, session) => void`); `index.ts` lists them in system-prompt order.
@@ -40,8 +44,21 @@ debugging web apps under development. See `README.md` for user docs.
 
 ## Conventions
 
-- Attach, never launch, from tool code. Chrome is the user's; the launcher is a
-  convenience. `browser.close()` on a connected browser only disconnects.
+- Attach-only by default; `PI_DEVTOOLS_AUTO_LAUNCH=1` enables managed lazy launch
+  from tools. Never kill shared Chrome on pi shutdown. `browser.close()` on a
+  connected browser only disconnects.
+- `PI_DEVTOOLS_BACKGROUND=1` uses macOS `open -g -n -W` with explicit output logs;
+  the launcher PID can be `open`, not Chrome. Never refocus the desktop after launch
+  as a workaround. Launch with `--no-startup-window`, create the first window
+  minimized, and create targets with `background: true`; only `browser_tabs focus`
+  may deliberately bring a page forward.
+- All browser tools use `executionMode: sequential`. `getPage(true)` is only for
+  intentional navigation after a reset; other operations must surface state loss.
+  Do not restore or replay actions. Use stable CDP target ids rather than list
+  indices in new integrations.
+- Runtime `ensure`/`focus` must honor attach-only mode. With auto-launch disabled,
+  an unavailable external endpoint fails instead of invoking the local launcher.
+  Gateway CDP URLs include `/cdp`; don't assume browser/client filesystem identity.
 - One driven tab. `browser_tabs use` switches it; switching resets the buffers.
   Never close the last tab (Chrome would exit).
 - Every state-changing tool (navigate, interact, wait) records `started =
@@ -66,7 +83,9 @@ debugging web apps under development. See `README.md` for user docs.
 
 ```bash
 npm run typecheck            # must print "typecheck ok"
-npm run smoke                # must print "all checks passed" and exit 0
+npm run smoke                # uses configured Chrome; must print "all checks passed"
+# Cross-process startup, isolated tabs/cookies, restart and macOS focus:
+cd ../pi-assistant && npx tsx test/live.ts
 pi -e ./src/index.ts -p "Use browser_navigate to open https://example.com, then browser_dom with mode aria, then stop."
 ```
 

@@ -21,6 +21,7 @@ const parameters = Type.Object({
 export const registerConsole: ToolRegistrar = (pi, session) => {
   pi.registerTool({
     name: "browser_console",
+    executionMode: "sequential",
     label: "Browser Console",
     description:
       "Console output and uncaught exceptions from the current tab, buffered since the tab was adopted " +
