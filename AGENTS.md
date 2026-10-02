@@ -24,10 +24,14 @@ research, authenticated web interaction, and application debugging. See `README.
   navigate/interact/wait results), `whereAmI`, `normalizeUrl`, `shortUrl`.
 - `src/config.ts` — endpoint/profile/auto-launch configuration; optional bearer
   token or token-file auth is applied to both discovery and connectOverCDP.
-- `src/launch.ts` — `probe()`, `ensureChrome()`, `launchChrome()`. Managed launches
+- `src/launch.ts` — `probe()`, `ensureChrome()`, `launchChrome()`, `stopChrome()`. Managed launches
   use a cross-process proper-lockfile lock and match CDP's identity to the new
   Chrome's stderr announcement before recording it. Never adopt unknown listeners.
-- `src/index.ts` also serves versioned runtime/snapshot pi.events channels (README).
+  Explicit managed stop shares the launch lock, verifies identity, sends Browser.close
+  to the run-specific WebSocket, and waits for port/profile unlock. Never kill the
+  saved launcher PID (it may be macOS `open`) or launch just to stop.
+- `src/index.ts` also serves versioned runtime/snapshot/capabilities pi.events channels
+  (README); managedStop capability gates coordinators using the runtime stop operation.
 - `src/command.ts` — `/devtools [status|launch [url]|disconnect]`.
 - `src/tools/` — one tool per file, each exporting a `ToolRegistrar`
   (`(pi, session) => void`); `index.ts` lists them in system-prompt order.

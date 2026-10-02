@@ -1,6 +1,7 @@
 /** Lazy, detached Chrome launch. Managed mode never adopts an unknown CDP listener. */
 import { spawn } from "node:child_process";
-import { mkdir, readFile, writeFile, rename, open } from "node:fs/promises";
+import { mkdir, readFile, writeFile, rename, open, lstat } from "node:fs/promises";
+import { chromium } from "playwright-core";
 import { connect } from "node:net";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -46,6 +47,60 @@ export async function ensureRuntime(): Promise<DevtoolsVersion> {
   const version = await probe();
   if (!version) throw new Error(`Chrome at ${cdpUrl()} is unavailable or authentication failed. In attach-only mode its lifecycle belongs to the external host.`);
   return version;
+}
+
+/** Explicit managed shutdown only. Never launch, signal a cached PID, or touch attach-only browsers. */
+export async function stopChrome(): Promise<boolean> {
+  if (!autoLaunch()) throw new Error("Stopping Chrome requires local managed mode; external browsers belong to their host.");
+  const endpoint = cdpUrl();
+  const profile = profileDir();
+  const url = new URL(endpoint);
+  if (url.protocol !== "http:" || url.hostname !== "127.0.0.1" || !url.port || url.pathname !== "/") {
+    throw new Error("Stopping Chrome requires a local loopback CDP endpoint.");
+  }
+  try { await lstat(profile); }
+  catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    if (await occupied(Number(url.port))) throw new Error("Cannot verify Chrome for shutdown: the debug port is occupied.");
+    return false;
+  }
+  const release = await lockfile.lock(profile, {
+    stale: 60_000, update: 10_000, retries: { retries: 150, minTimeout: 500, maxTimeout: 500 },
+  });
+  try {
+    const version = await probe(1_000, endpoint);
+    if (!version) {
+      if (await occupied(Number(url.port))) throw new Error("Cannot verify Chrome for shutdown: the debug port is occupied.");
+      return false;
+    }
+    await verifyIdentity(version, profile, endpoint);
+    // Connect to the verified, run-specific WebSocket, not a newly discovered browser.
+    // The recorded launch PID may be macOS's `open`, not Chrome itself.
+    const browser = await chromium.connectOverCDP(version.webSocketDebuggerUrl!, { timeout: 5_000 });
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      await Promise.race([
+        (async () => {
+          const cdp = await browser.newBrowserCDPSession();
+          // Chrome can disconnect before acknowledging Browser.close. Verify exit below.
+          await cdp.send("Browser.close").catch(() => {});
+        })(),
+        new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error("Chrome shutdown request timed out.")), 5_000); }),
+      ]);
+    } finally {
+      clearTimeout(timer);
+      await browser.close(); // detach only; Browser.close above is the actual shutdown
+    }
+    const deadline = Date.now() + 15_000;
+    while (Date.now() < deadline) {
+      let profileLocked = true;
+      try { await lstat(join(profile, "SingletonLock")); }
+      catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") profileLocked = false; else throw error; }
+      if (!profileLocked && !(await occupied(Number(url.port)))) return true;
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    throw new Error("Chrome did not finish shutting down; no force-kill was attempted.");
+  } finally { await release(); }
 }
 
 /** With auto-launch enabled this validates identity even when Chrome is already running. */

@@ -10,7 +10,7 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { registerCommand } from "./command";
 import { DevtoolsSession } from "./session";
-import { ensureRuntime, probe, verifyIdentity } from "./launch";
+import { ensureRuntime, probe, verifyIdentity, stopChrome } from "./launch";
 import { autoLaunch } from "./config";
 import { registerTools } from "./tools";
 
@@ -24,10 +24,14 @@ export default function (pi: ExtensionAPI) {
 
   // Public, versioned integration channels. The request receives its Promise
   // synchronously, so callers can detect an absent extension without a timeout.
+  pi.events.on("pi-devtools:capabilities:v1", (data) => {
+    (data as { result?: unknown }).result = { managedStop: true };
+  });
   pi.events.on("pi-devtools:runtime:v1", (data) => {
-    const request = data as { operation: "ensure" | "status" | "focus"; result?: Promise<unknown> };
+    const request = data as { operation: "ensure" | "status" | "focus" | "stop"; result?: Promise<unknown> };
     request.result = (async () => {
       if (request.operation === "ensure") return ensureRuntime();
+      if (request.operation === "stop") return stopChrome();
       if (request.operation === "focus") {
         await ensureRuntime();
         const page = await session.getPage(true);

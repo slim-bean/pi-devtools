@@ -154,10 +154,20 @@ to the browser's host, not the machine running pi.
 
 Versioned `pi.events` request channels (responders assign `request.result` synchronously):
 
-- `pi-devtools:runtime:v1`: `{operation: "ensure" | "status" | "focus", result?: Promise<unknown>}`.
+- `pi-devtools:capabilities:v1`: `{result?: {managedStop: boolean}}` advertises
+  managed shutdown support (`managedStop: true`).
+- `pi-devtools:runtime:v1`: `{operation: "ensure" | "status" | "focus" | "stop", result?: Promise<unknown>}`.
   `ensure` launches only when managed auto-launch is enabled, otherwise requires
   an existing reachable endpoint. `status` only probes and validates managed identity;
   `focus` explicitly restores/foregrounds the current (or a new) interactive tab.
+  `stop` requires managed auto-launch and a loopback endpoint, verifies the profile's
+  browser identity, then sends CDP `Browser.close` to that exact browser run. It shares
+  the launch lock and waits for the debug port/profile lock to clear. It never launches,
+  kills a cached PID, or force-kills; attach-only/external mode is rejected. The result
+  is `true` if stopped, `false` if already absent. This affects **all** clients and loses
+  tabs; the next use may relaunch. Coordinators must explicitly authorize shared shutdown.
+  pi-assistant exposes this as local-only `/assistant stop`; session shutdown still only
+  disconnects.
 - `pi-devtools:snapshot:v1`: `{result?: Promise<{html, url, title}>}` reads the current
   tab without navigation. Caller should register a sequential tool (as `browser_read`
   does). A missing `result` means this extension/version isn't loaded.
