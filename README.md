@@ -75,14 +75,35 @@ attaches.
 | `browser_console` | Console messages and uncaught exceptions since last read, with source locations. |
 | `browser_network` | Requests since last read. Failed API/document calls include request and response bodies. |
 | `browser_eval` | Run JS in the page (`await` and `return` allowed); JSON result. |
-| `browser_dom` | Accessibility tree (default), text, or HTML of the page or a selector. |
+| `browser_dom` | Accessibility tree (default), native text/HTML, or an open-shadow DOM outline (`mode: "shadow"`). |
 | `browser_screenshot` | Viewport, full page, or one element, returned as an image; optionally saved to a file. |
 | `browser_interact` | click / dblclick / fill / type / press / hover / check / uncheck / select. Reports what changed. |
 | `browser_wait` | Wait for a selector state, URL change, network idle, or delay. |
 
 Selectors are Playwright selectors: CSS, `text=Sign in`,
 `role=button[name="Save"]`, `[data-testid=x]`, `xpath=…`.
-`browser_dom` (aria mode) is the intended way to find them.
+`browser_dom` (aria mode) is the intended way to find them. A snapshot entry
+`button "Reload"` maps to `role=button[name="Reload"]`, **not** necessarily
+`button:has-text("Reload")`: roles need not be HTML tags, and an icon-only control
+can have an accessible name without containing that text.
+
+CSS, role, and text selectors already pierce **open** shadow roots. XPath and
+native `document.querySelector()` in `browser_eval` do not; closed roots are
+unsupported. An empty query is not evidence of a closed root.
+
+For component internals, use `browser_dom` with `mode: "shadow"` and an optional
+`selector`. It returns an indented structural outline with `#shadow-root (open)`
+markers, attributes, and text—not valid HTML or visibility-filtered/composed text.
+Light DOM and shadow children appear once each; slot assignments are not expanded.
+Closed roots and iframe documents are not entered; script/style/template contents
+are omitted. Per match, traversal is capped at 5,000 nodes, depth 40, and 50,000
+characters (or a smaller `maxChars`); long values/attribute lists are abbreviated.
+Native `text`/`html` modes are unchanged and warn that they may omit shadow content.
+
+Interaction timeouts retain a bounded Playwright diagnostic excerpt (missing,
+hidden, disabled, or intercepted target) and relevant selector hints. They never
+retry a different target. `browser_interact.value` is only accepted for
+fill/type/press/select; other actions reject it, including coordinate-like values.
 
 ## Command
 
@@ -187,7 +208,8 @@ dedicated profile as the agent's identity, not yours.
 
 ```bash
 npm run typecheck   # against the globally installed pi's real types
-npm run smoke       # launches/attaches Chrome, serves a deliberately broken app, checks every capability
+npm run smoke       # launches/attaches Chrome, checks capabilities plus DOM/interaction regressions
+npm run smoke:dom   # same DOM regressions in disposable headless Chrome; never touches shared tabs
 pi -e ./src/index.ts -p "Use browser_navigate on https://example.com, then browser_dom. Then stop."
 ```
 

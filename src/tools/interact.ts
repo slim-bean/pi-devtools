@@ -1,13 +1,8 @@
 import { StringEnum } from "@earendil-works/pi-ai";
 import { Type } from "typebox";
-import type { Page } from "playwright-core";
 import { sinceSummary, whereAmI } from "../format";
+import { ACTIONS, performInteraction, validateInteraction } from "../interaction";
 import { ACTION_TIMEOUT_MS, explain, SETTLE_MS, textResult, withAbort, type ToolRegistrar } from "./shared";
-
-const ACTIONS = ["click", "dblclick", "fill", "type", "press", "hover", "check", "uncheck", "select"] as const;
-type Action = (typeof ACTIONS)[number];
-
-const NEEDS_VALUE = new Set<Action>(["fill", "type", "press", "select"]);
 
 const parameters = Type.Object({
   action: StringEnum(ACTIONS, {
@@ -22,32 +17,13 @@ const parameters = Type.Object({
       description:
         "CSS or Playwright selector: '#save', 'button:has-text(\"Save\")', 'text=Sign in', " +
         "'role=button[name=\"Save\"]', '[data-testid=x]', 'xpath=//a'. Must match exactly one element; " +
-        "use browser_dom (mode aria) to find candidates.",
+        'use browser_dom (mode aria) to find candidates. Snapshot button "Reload" means ' +
+        'role=button[name="Reload"], not button:has-text("Reload"). CSS/role/text selectors pierce open shadow roots; XPath does not.',
     }),
   ),
-  value: Type.Optional(Type.String({ description: "Text for fill/type, key for press, option for select." })),
+  value: Type.Optional(Type.String({ description: "Only for fill/type (text), press (key), or select (option). Rejected for other actions; no coordinate clicks." })),
   timeoutMs: Type.Optional(Type.Number({ description: `Wait up to this long for the element (default ${ACTION_TIMEOUT_MS}).` })),
 });
-
-async function perform(page: Page, action: Action, selector: string | undefined, value: string | undefined, timeout: number) {
-  if (action === "press" && !selector) {
-    await page.keyboard.press(value!);
-    return;
-  }
-  if (!selector) throw new Error(`${action} needs a selector`);
-  const el = page.locator(selector);
-  switch (action) {
-    case "click": return el.click({ timeout });
-    case "dblclick": return el.dblclick({ timeout });
-    case "hover": return el.hover({ timeout });
-    case "check": return el.check({ timeout });
-    case "uncheck": return el.uncheck({ timeout });
-    case "fill": return el.fill(value!, { timeout });
-    case "type": return el.pressSequentially(value!, { timeout });
-    case "press": return el.press(value!, { timeout });
-    case "select": return el.selectOption(value!, { timeout }).then(() => undefined);
-  }
-}
 
 export const registerInteract: ToolRegistrar = (pi, session) => {
   pi.registerTool({
@@ -61,20 +37,19 @@ export const registerInteract: ToolRegistrar = (pi, session) => {
     promptSnippet: "Click / type / press keys / select in the live page",
     promptGuidelines: [
       "Use browser_dom with mode aria to discover roles, names and structure before choosing a selector " +
-        "for browser_interact; prefer role=, text= or data-testid selectors over brittle CSS paths.",
+        'for browser_interact. Snapshot button "Reload" maps to role=button[name="Reload"]; roles are not HTML tags ' +
+        "and accessible names are not necessarily text content. Prefer role selectors for controls.",
     ],
     parameters,
     async execute(_id, params, signal) {
-      if (NEEDS_VALUE.has(params.action) && params.value === undefined) {
-        throw new Error(`${params.action} requires a value`);
-      }
+      validateInteraction(params.action, params.selector, params.value);
       const page = await session.getPage();
       const timeout = params.timeoutMs ?? ACTION_TIMEOUT_MS;
       const started = Date.now();
       try {
-        await withAbort(perform(page, params.action, params.selector, params.value, timeout), signal);
+        await withAbort(performInteraction(page, params.action, params.selector, params.value, timeout), signal);
       } catch (e) {
-        throw explain(e);
+        throw explain(e, undefined, params.selector);
       }
       // Let click handlers fire and their requests land, bounded so long-polling apps don't stall us.
       await page.waitForLoadState("networkidle", { timeout: SETTLE_MS }).catch(() => {});

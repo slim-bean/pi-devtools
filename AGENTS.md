@@ -19,6 +19,10 @@ research, authenticated web interaction, and application debugging. See `README.
   Also `safeStringify`, `clip`, `isFailure`, `cdpUrl`.
 - `src/page.ts` — Playwright-only helpers (`evalInPage`: expression first,
   statement-body fallback on SyntaxError). No pi imports, so scripts can use it.
+- `src/dom.ts` — bounded, read-only open-shadow structural outline for `browser_dom`
+  mode `shadow`; no cloning custom elements, composed-slot expansion, or frame traversal.
+- `src/interaction.ts` — argument validation and Playwright action dispatch.
+- `src/errors.ts` — bounded Playwright diagnostics and selector hints; never retries actions.
 - `src/format.ts` — LLM-facing rendering: `formatConsole`, `formatNetwork`,
   `sinceSummary` (the "what changed since ts" block appended to
   navigate/interact/wait results), `whereAmI`, `normalizeUrl`, `shortUrl`.
@@ -44,7 +48,8 @@ research, authenticated web interaction, and application debugging. See `README.
 - `scripts/typecheck.sh` — generates a temporary tsconfig whose `paths` point
   at the globally installed pi, so peers resolve to real types without bundling.
 - `scripts/smoke.ts` — no-LLM end-to-end check against a local server that
-  500s, 404s and throws on purpose.
+  500s, 404s and throws on purpose; also runs `scripts/dom-checks.ts` regressions.
+  `scripts/smoke-dom.ts` runs just those regressions in disposable headless Chrome.
 
 ## Conventions
 
@@ -80,14 +85,22 @@ research, authenticated web interaction, and application debugging. See `README.
 - Bound all output: `bounded(text, "head")` for structured results,
   `"tail"` for logs. Screenshots go through pi's `resizeImage` (≤1568px, ≤3MB)
   and are captured at `scale: "css"` so retina displays don't quadruple the bytes.
-- Keep `src/page.ts` and `src/session.ts` free of pi imports so `scripts/`
-  can run them under `tsx` without pi's jiti aliases.
+- Keep page/session/DOM/interaction/error helpers free of pi imports so `scripts/`
+  can run them under `tsx` without pi's jiti aliases. In serialized evaluate callbacks,
+  avoid nested named functions that tsx/esbuild decorates with an unavailable `__name`;
+  object methods work without injected helpers.
+- ARIA roles/names are not HTML tags/text: `button "Reload"` maps to
+  `role=button[name="Reload"]`. CSS/role/text selectors pierce open roots;
+  XPath/native DOM queries do not. Keep native text/HTML semantics unchanged.
+- Reject unused interaction values before attaching. Preserve bounded timeout evidence;
+  selector hints must never dispatch a fallback action.
 
 ## Testing
 
 ```bash
 npm run typecheck            # must print "typecheck ok"
 npm run smoke                # uses configured Chrome; must print "all checks passed"
+npm run smoke:dom            # disposable headless Chrome; "all DOM checks passed"
 # Cross-process startup, isolated tabs/cookies, restart and macOS focus:
 cd ../pi-assistant && npx tsx test/live.ts
 pi -e ./src/index.ts -p "Use browser_navigate to open https://example.com, then browser_dom with mode aria, then stop."

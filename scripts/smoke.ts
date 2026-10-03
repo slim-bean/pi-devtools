@@ -10,6 +10,7 @@ import { formatConsole, formatNetwork, sinceSummary } from "../src/format";
 import { launchChrome } from "../src/launch";
 import { DevtoolsSession } from "../src/session";
 import { evalInPage } from "../src/page";
+import { checkDOM } from "./dom-checks";
 
 const PAGE = `<!doctype html><html><head><title>smoke app</title></head><body>
 <h1>Smoke</h1>
@@ -79,6 +80,13 @@ async function main(): Promise<void> {
     const t1 = Date.now();
     await page.locator("#go").click();
     await page.waitForLoadState("networkidle", { timeout: 2000 }).catch(() => {});
+    // The document can already be networkidle before the click's fetch finishes,
+    // and finishRequest captures response bodies asynchronously. Wait for capture,
+    // not merely the response status, before asserting diagnostics.
+    const captureDeadline = Date.now() + 2000;
+    while (!session.network(t1).some((e) => e.url.endsWith("/api/boom") && e.responseBody) && Date.now() < captureDeadline) {
+      await page.waitForTimeout(20);
+    }
     const boom = session.network(t1).find((e) => e.url.endsWith("/api/boom"));
     check(boom?.status === 500, "POST /api/boom recorded as 500");
     check(boom?.requestBody?.includes("bob"), "request body captured on failure");
@@ -105,6 +113,7 @@ async function main(): Promise<void> {
       page.url(),
     ));
 
+    await checkDOM(page);
     console.log("\nall checks passed");
   } finally {
     await page?.close().catch(() => {});

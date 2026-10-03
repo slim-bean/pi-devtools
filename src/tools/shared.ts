@@ -68,22 +68,4 @@ export function withTimeout<T>(p: Promise<T>, ms: number, what: string): Promise
   return Promise.race([p, t]).finally(() => clearTimeout(timer));
 }
 
-/** Re-throw Playwright/Chrome errors with a hint the model can act on. */
-export function explain(err: unknown, url?: string): Error {
-  const msg = (err as Error)?.message ?? String(err);
-  const first = msg.split("\n")[0];
-  if (/ERR_CONNECTION_REFUSED/.test(msg)) {
-    return new Error(`${first} — nothing is listening at ${url ?? "that address"}. Is the dev server running?`);
-  }
-  if (/ERR_NAME_NOT_RESOLVED/.test(msg)) {
-    return new Error(`${first} — DNS lookup failed for ${url ?? "that host"}.`);
-  }
-  if (/strict mode violation/i.test(msg)) {
-    // Playwright already lists the matching elements; keep that, drop the call-log noise.
-    return new Error(msg.split("\nCall log")[0]);
-  }
-  if (/Timeout .* exceeded/.test(first) || /timed out/i.test(first)) {
-    return new Error(msg.split("\nCall log")[0]);
-  }
-  return err instanceof Error ? err : new Error(msg);
-}
+export { explain } from "../errors";
