@@ -38,9 +38,9 @@ pi install git:github.com/slim-bean/pi-devtools
 Or, to hack on it, clone and install the working tree instead:
 
 ```bash
-git clone https://github.com/slim-bean/pi-devtools ~/projects/pi-devtools
-cd ~/projects/pi-devtools && npm install
-pi install ~/projects/pi-devtools
+git clone https://github.com/slim-bean/pi-devtools ~/projects/pi-extensions/pi-devtools
+cd ~/projects/pi-extensions/pi-devtools && npm install
+pi install ~/projects/pi-extensions/pi-devtools
 ```
 
 Then start Chrome with remote debugging, either from pi:
