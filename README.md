@@ -207,6 +207,7 @@ dedicated profile as the agent's identity, not yours.
 ## Development
 
 ```bash
+npm test            # synthetic local CDP discovery; no Chrome or user profile
 npm run typecheck   # against the globally installed pi's real types
 npm run smoke       # launches/attaches Chrome, checks capabilities plus DOM/interaction regressions
 npm run smoke:dom   # same DOM regressions in disposable headless Chrome; never touches shared tabs
