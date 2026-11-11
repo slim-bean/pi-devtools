@@ -11,7 +11,13 @@ test("real Playwright discovery preserves gateway prefix, token rotation and sha
   const dir = await mkdtemp(join(tmpdir(), "pi-devtools-cdp-"));
   const env = { ...process.env };
   const requests: { url: string | undefined; authorization: string | undefined }[] = [];
+  let malformedDiscovery = false;
   const server = createServer((req, res) => {
+    if (malformedDiscovery) {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ Browser: "Synthetic Chrome" }));
+      return;
+    }
     requests.push({ url: req.url, authorization: req.headers.authorization });
     res.writeHead(403, { "Content-Type": "text/plain" });
     res.end("Synthetic gateway denied discovery");
@@ -46,6 +52,15 @@ test("real Playwright discovery preserves gateway prefix, token rotation and sha
     await assert.rejects(session.connect(), /Cannot reach Chrome DevTools/);
     assert.equal(requests.length, 2, "later explicit attach is allowed after failure");
     assert.equal(requests[1].authorization, "Bearer rotated-synthetic-token");
+
+    // A successful HTTP response is not a usable CDP connection when the
+    // discovery document lacks a websocket URL. Never launch a replacement.
+    malformedDiscovery = true;
+    await assert.rejects(session.connect(), /Cannot reach Chrome DevTools/);
+    assert.equal(session.isConnected(), false);
+    malformedDiscovery = false;
+    await assert.rejects(session.connect(), /Cannot reach Chrome DevTools/);
+    assert.equal(requests.length, 3, "malformed discovery must not poison later explicit attaches");
   } finally {
     await session.close();
     process.env = env;
