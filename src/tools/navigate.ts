@@ -1,5 +1,6 @@
 import { StringEnum } from "@earendil-works/pi-ai";
 import { Type } from "typebox";
+import { enumValue } from "../enum";
 import { normalizeUrl, sinceSummary, whereAmI } from "../format";
 import { explain, NAV_TIMEOUT_MS, textResult, withAbort, type ToolRegistrar } from "./shared";
 
@@ -33,6 +34,7 @@ export const registerNavigate: ToolRegistrar = (pi, session) => {
     ],
     parameters,
     async execute(_id, params, signal, onUpdate) {
+      const waitUntil = enumValue(params.waitUntil ?? "load", ["load", "domcontentloaded", "networkidle", "commit"], "waitUntil");
       const page = await session.getPage(true);
       const url = normalizeUrl(params.url);
       onUpdate?.({ content: [{ type: "text", text: `Navigating to ${url}…` }], details: {} });
@@ -41,7 +43,7 @@ export const registerNavigate: ToolRegistrar = (pi, session) => {
       let response;
       try {
         response = await withAbort(
-          page.goto(url, { waitUntil: params.waitUntil ?? "load", timeout: params.timeoutMs ?? NAV_TIMEOUT_MS }),
+          page.goto(url, { waitUntil, timeout: params.timeoutMs ?? NAV_TIMEOUT_MS }),
           signal,
         );
       } catch (e) {

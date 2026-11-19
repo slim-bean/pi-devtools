@@ -1,5 +1,6 @@
 import { StringEnum } from "@earendil-works/pi-ai";
 import { Type } from "typebox";
+import { enumValue } from "../enum";
 import type { Page } from "playwright-core";
 import { normalizeUrl, whereAmI } from "../format";
 import type { DevtoolsSession } from "../session";
@@ -36,6 +37,7 @@ export const registerTabs: ToolRegistrar = (pi, session) => {
     ],
     parameters,
     async execute(_id, params) {
+      const action = enumValue(params.action, ["list", "use", "new", "close", "focus"], "action");
       const pick = async (): Promise<Page> => {
         const pages = await session.listPages();
         if (params.id !== undefined && params.index !== undefined) throw new Error("Pass id or index, not both.");
@@ -44,7 +46,7 @@ export const registerTabs: ToolRegistrar = (pi, session) => {
         } else if (params.index !== undefined && pages[params.index]) return pages[params.index];
         throw new Error("Tab not found; call browser_tabs list and use a current id.");
       };
-      switch (params.action) {
+      switch (action) {
         case "list": return textResult(await listing(session));
         case "use": {
           const page = await pick();

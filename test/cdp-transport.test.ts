@@ -7,6 +7,50 @@ import { join } from "node:path";
 import { test } from "node:test";
 import { DevtoolsSession } from "../src/session";
 
+// Exercise the real Playwright WebSocket upgrade path without launching Chrome
+// or touching a user profile; discovery alone does not establish a connection.
+test("rejected authenticated WebSocket upgrade leaves no connected session", async () => {
+  const env = { ...process.env };
+  const upgrades: { url: string | undefined; authorization: string | undefined }[] = [];
+  let websocketUrl = "";
+  const server = createServer((_req, res) => {
+    res.writeHead(200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ webSocketDebuggerUrl: websocketUrl }));
+  });
+  server.on("upgrade", (req, socket) => {
+    upgrades.push({ url: req.url, authorization: req.headers.authorization });
+    socket.end("HTTP/1.1 403 Forbidden\r\nConnection: close\r\nContent-Length: 0\r\n\r\n");
+  });
+  const session = new DevtoolsSession();
+  try {
+    server.listen(0, "127.0.0.1");
+    await once(server, "listening");
+    const address = server.address();
+    assert.ok(address && typeof address === "object");
+    websocketUrl = `ws://127.0.0.1:${address.port}/cdp/devtools/browser/synthetic`;
+    process.env.PI_DEVTOOLS_CDP_URL = `http://127.0.0.1:${address.port}/cdp`;
+    process.env.PI_DEVTOOLS_CDP_TOKEN = "synthetic-websocket-token";
+    delete process.env.PI_DEVTOOLS_CDP_TOKEN_FILE;
+    process.env.PI_DEVTOOLS_AUTO_LAUNCH = "0";
+    for (let attempt = 0; attempt < 2; attempt++) {
+      await assert.rejects(session.connect(), (error: Error) => {
+        assert.match(error.message, /Cannot reach Chrome DevTools/);
+        assert.doesNotMatch(error.message, /synthetic-websocket-token/);
+        return true;
+      });
+      assert.equal(session.isConnected(), false);
+      assert.equal(session.currentPage(), null);
+    }
+    assert.deepEqual(upgrades, Array.from({ length: 2 }, () => ({
+      url: "/cdp/devtools/browser/synthetic", authorization: "Bearer synthetic-websocket-token",
+    })));
+  } finally {
+    await session.close();
+    process.env = env;
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
+});
+
 test("real Playwright discovery preserves gateway prefix, token rotation and shared failure admission", async () => {
   const dir = await mkdtemp(join(tmpdir(), "pi-devtools-cdp-"));
   const env = { ...process.env };

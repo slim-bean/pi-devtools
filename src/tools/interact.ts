@@ -1,5 +1,6 @@
 import { StringEnum } from "@earendil-works/pi-ai";
 import { Type } from "typebox";
+import { enumValue } from "../enum";
 import { sinceSummary, whereAmI } from "../format";
 import { ACTIONS, performInteraction, validateInteraction } from "../interaction";
 import { ACTION_TIMEOUT_MS, explain, SETTLE_MS, textResult, withAbort, type ToolRegistrar } from "./shared";
@@ -42,12 +43,13 @@ export const registerInteract: ToolRegistrar = (pi, session) => {
     ],
     parameters,
     async execute(_id, params, signal) {
-      validateInteraction(params.action, params.selector, params.value);
+      const action = enumValue(params.action, ACTIONS, "action");
+      validateInteraction(action, params.selector, params.value);
       const page = await session.getPage();
       const timeout = params.timeoutMs ?? ACTION_TIMEOUT_MS;
       const started = Date.now();
       try {
-        await withAbort(performInteraction(page, params.action, params.selector, params.value, timeout), signal);
+        await withAbort(performInteraction(page, action, params.selector, params.value, timeout), signal);
       } catch (e) {
         throw explain(e, undefined, params.selector);
       }

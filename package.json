@@ -1,6 +1,6 @@
 {
   "name": "pi-devtools",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "description": "Use a live Chrome from pi for research, authenticated websites, interaction, and application debugging.",
   "type": "module",
   "license": "MIT",
@@ -29,7 +29,7 @@
     "test": "tsx --test test/*.test.ts"
   },
   "dependencies": {
-    "playwright-core": "^1.65.0",
+    "playwright-core": "^1.65.1",
     "proper-lockfile": "^4.1.2"
   },
   "devDependencies": {

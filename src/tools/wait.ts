@@ -1,5 +1,6 @@
 import { StringEnum } from "@earendil-works/pi-ai";
 import { Type } from "typebox";
+import { enumValue } from "../enum";
 import { sinceSummary, whereAmI } from "../format";
 import { ACTION_TIMEOUT_MS, explain, textResult, withAbort, type ToolRegistrar } from "./shared";
 
@@ -31,13 +32,13 @@ export const registerWait: ToolRegistrar = (pi, session) => {
       if (!params.selector && !params.urlContains && !params.networkIdle && !params.ms) {
         throw new Error("browser_wait needs at least one of selector, urlContains, networkIdle, ms");
       }
+      const state = enumValue(params.state ?? "visible", ["visible", "hidden", "attached", "detached"], "state");
       const page = await session.getPage();
       const timeout = params.timeoutMs ?? ACTION_TIMEOUT_MS;
       const started = Date.now();
       const did: string[] = [];
       try {
         if (params.selector) {
-          const state = params.state ?? "visible";
           await withAbort(page.locator(params.selector).first().waitFor({ state, timeout }), signal);
           did.push(`${params.selector} is ${state}`);
         }
