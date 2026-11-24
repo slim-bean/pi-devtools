@@ -11,7 +11,7 @@ export function registerCommand(pi: ExtensionAPI, session: DevtoolsSession): voi
   pi.registerCommand("devtools", {
     description: "Live Chrome tools: /devtools [status|launch [url]|disconnect]",
     getArgumentCompletions(prefix) {
-      const items = SUBCOMMANDS.filter((s) => s.startsWith(prefix)).map((s) => ({ value: s, label: s }));
+      const items = SUBCOMMANDS.filter((s) => s.startsWith(prefix.trimStart())).map((s) => ({ value: s, label: s }));
       return items.length ? items : null;
     },
     async handler(args, ctx) {
